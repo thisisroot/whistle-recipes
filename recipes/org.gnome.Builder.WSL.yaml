@@ -1,0 +1,17 @@
+# GNOME Builder on Windows, installed into Whistle's WSL distro and shown via WSLg.
+schema_version: 1
+id: org.gnome.Builder.WSL
+app: org.gnome.Builder
+runtime: wsl
+requires:
+  ram_mb: 2048
+installer:
+  type: package
+  manager: apt
+  ref: gnome-builder
+launchers:
+  - name: GNOME Builder
+    exe: gnome-builder
+    categories: [Development, IDE]
+health_check:
+  launcher: GNOME Builder

@@ -1,0 +1,239 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:whistle:schema:recipe:1",
+  "title": "Whistle recipe",
+  "description": "How to install and launch an app on a host it was not built for. Steps are typed actions from a fixed whitelist; there is no shell.",
+  "type": "object",
+  "required": ["schema_version", "id", "app", "runtime", "installer", "launchers"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "const": 1 },
+    "id": { "$ref": "#/$defs/reverse_dns", "description": "Unique recipe id. Must match the file name." },
+    "app": { "$ref": "#/$defs/reverse_dns", "description": "Catalog App id this recipe installs." },
+    "version_range": { "type": "string", "minLength": 1, "maxLength": 100, "description": "App versions this recipe applies to, e.g. \"2016\" or \">=2024,<2026\"." },
+    "runtime": { "enum": ["wine", "proton", "vm", "wsl"] },
+    "maintainers": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9-]{0,38}$", "description": "GitHub handle." }
+    },
+    "requires": { "$ref": "#/$defs/requires" },
+    "installer": { "$ref": "#/$defs/installer" },
+    "steps": { "type": "array", "items": { "$ref": "#/$defs/step" } },
+    "launchers": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/launcher" } },
+    "health_check": { "$ref": "#/$defs/health_check" },
+    "fallback": { "enum": ["vm", "none"], "default": "none" }
+  },
+  "allOf": [
+    {
+      "if": { "required": ["runtime"], "properties": { "runtime": { "enum": ["wine", "proton"] } } },
+      "then": {
+        "properties": {
+          "installer": { "properties": { "type": { "enum": ["download", "user_supplied"] } } },
+          "launchers": { "items": { "properties": { "exe": { "$ref": "#/$defs/windows_path" } } } }
+        }
+      }
+    },
+    {
+      "if": { "required": ["runtime"], "properties": { "runtime": { "const": "wine" } } },
+      "then": { "properties": { "requires": { "properties": { "proton": false } } } }
+    },
+    {
+      "if": { "required": ["runtime"], "properties": { "runtime": { "const": "proton" } } },
+      "then": { "properties": { "requires": { "properties": { "wine": false } } } }
+    },
+    {
+      "if": { "required": ["runtime"], "properties": { "runtime": { "const": "vm" } } },
+      "then": {
+        "properties": {
+          "installer": { "properties": { "type": { "enum": ["download", "user_supplied"] } } },
+          "steps": { "items": { "propertyNames": { "const": "run_installer" } } },
+          "launchers": { "items": { "properties": { "exe": { "$ref": "#/$defs/windows_path" } } } },
+          "requires": { "properties": { "wine": false, "proton": false } },
+          "fallback": { "const": "none" }
+        }
+      }
+    },
+    {
+      "if": { "required": ["runtime"], "properties": { "runtime": { "const": "wsl" } } },
+      "then": {
+        "properties": {
+          "installer": { "properties": { "type": { "const": "package" } } },
+          "steps": { "maxItems": 0 },
+          "launchers": { "items": { "properties": { "exe": { "$ref": "#/$defs/linux_command" } } } },
+          "requires": { "properties": { "wine": false, "proton": false, "arch": false } },
+          "fallback": { "const": "none" }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "reverse_dns": {
+      "type": "string",
+      "maxLength": 255,
+      "pattern": "^[A-Za-z][A-Za-z0-9_-]*(\\.[A-Za-z0-9_-]+)+$"
+    },
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$", "description": "Lowercase hex SHA-256." },
+    "https_url": { "type": "string", "maxLength": 2048, "pattern": "^https://\\S+$" },
+    "windows_path": {
+      "type": "string",
+      "maxLength": 512,
+      "pattern": "^[A-Za-z]:\\\\(?!.*\\.\\.)[^\\n]+$",
+      "description": "Absolute path inside the Wine prefix or VM, e.g. C:\\Program Files\\App\\app.exe. No '..'."
+    },
+    "linux_command": {
+      "type": "string",
+      "maxLength": 512,
+      "pattern": "^(?!.*\\.\\.)[A-Za-z0-9._+/-]+$",
+      "description": "Command name on PATH or absolute path inside the WSL distro."
+    },
+    "version_constraint": {
+      "type": "string",
+      "pattern": "^\\s*(>=|<=|==|>|<)?\\s*\\d+(\\.\\d+)*(\\s*,\\s*(>=|<=|==|>|<)?\\s*\\d+(\\.\\d+)*)*\\s*$"
+    },
+    "requires": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "wine": { "$ref": "#/$defs/version_constraint" },
+        "proton": { "type": "string", "pattern": "^[A-Za-z0-9._-]+$", "description": "Pinned Proton build, e.g. GE-Proton9-20." },
+        "arch": { "enum": ["win32", "win64"] },
+        "ram_mb": { "type": "integer", "minimum": 256 },
+        "disk_mb": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "installer": {
+      "type": "object",
+      "required": ["type"],
+      "properties": { "type": { "enum": ["user_supplied", "download", "package"] } },
+      "allOf": [
+        {
+          "if": { "required": ["type"], "properties": { "type": { "const": "user_supplied" } } },
+          "then": {
+            "required": ["prompt", "sha256_any"],
+            "properties": {
+              "prompt": { "type": "string", "minLength": 1, "maxLength": 200 },
+              "sha256_any": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/sha256" } },
+              "file_name_hint": { "type": "string", "maxLength": 255 }
+            }
+          }
+        },
+        {
+          "if": { "required": ["type"], "properties": { "type": { "const": "download" } } },
+          "then": {
+            "required": ["url", "sha256"],
+            "properties": {
+              "url": { "$ref": "#/$defs/https_url" },
+              "sha256": { "$ref": "#/$defs/sha256" },
+              "file_name": { "type": "string", "maxLength": 255, "pattern": "^[^/\\\\]+$" }
+            }
+          }
+        },
+        {
+          "if": { "required": ["type"], "properties": { "type": { "const": "package" } } },
+          "then": {
+            "required": ["manager", "ref"],
+            "properties": {
+              "manager": { "enum": ["apt", "dnf", "pacman", "flatpak"] },
+              "ref": { "type": "string", "maxLength": 255, "pattern": "^[A-Za-z0-9][A-Za-z0-9._+:/-]*$" }
+            }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "step": {
+      "type": "object",
+      "description": "Exactly one typed action.",
+      "minProperties": 1,
+      "maxProperties": 1,
+      "propertyNames": { "enum": ["winetricks", "dll_override", "registry", "copy", "env", "run_installer"] },
+      "properties": {
+        "winetricks": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "pattern": "^[a-z0-9_]+(=[a-z0-9_.]+)?$" }
+        },
+        "dll_override": {
+          "type": "object",
+          "minProperties": 1,
+          "propertyNames": { "pattern": "^[A-Za-z0-9_.-]+$" },
+          "additionalProperties": { "enum": ["native", "builtin", "native,builtin", "builtin,native", "disabled"] }
+        },
+        "registry": {
+          "type": "object",
+          "required": ["key", "value"],
+          "additionalProperties": false,
+          "properties": {
+            "key": { "type": "string", "pattern": "^(HKCU|HKLM|HKEY_CURRENT_USER|HKEY_LOCAL_MACHINE)\\\\[^\\n]+$" },
+            "value": {
+              "type": "object",
+              "minProperties": 1,
+              "description": "Value name -> data. Strings become REG_SZ, integers REG_DWORD.",
+              "additionalProperties": {
+                "oneOf": [
+                  { "type": "string", "maxLength": 4096 },
+                  { "type": "integer", "minimum": 0, "maximum": 4294967295 }
+                ]
+              }
+            }
+          }
+        },
+        "copy": {
+          "type": "object",
+          "required": ["from", "to"],
+          "additionalProperties": false,
+          "properties": {
+            "from": {
+              "type": "string",
+              "pattern": "^(?![/\\\\])(?!.*\\.\\.)[^:\\n]+$",
+              "description": "Path relative to the installer media (download or user-supplied file/folder)."
+            },
+            "to": { "$ref": "#/$defs/windows_path" }
+          }
+        },
+        "env": {
+          "type": "object",
+          "minProperties": 1,
+          "propertyNames": {
+            "pattern": "^[A-Z_][A-Z0-9_]*$",
+            "not": { "enum": ["LD_PRELOAD", "LD_LIBRARY_PATH", "LD_AUDIT", "PATH", "HOME", "PYTHONPATH", "WINEPREFIX", "WINESERVER", "WINELOADER"] }
+          },
+          "additionalProperties": { "type": "string", "maxLength": 1024 }
+        },
+        "run_installer": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "args": { "type": "array", "items": { "type": "string", "maxLength": 512 } },
+            "timeout_s": { "type": "integer", "minimum": 1, "maximum": 7200 }
+          }
+        }
+      }
+    },
+    "launcher": {
+      "type": "object",
+      "required": ["name", "exe"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "exe": { "type": "string", "minLength": 1 },
+        "args": { "type": "array", "items": { "type": "string", "maxLength": 512 } },
+        "icon": { "type": "string", "maxLength": 512 },
+        "mime": { "type": "array", "uniqueItems": true, "items": { "type": "string", "pattern": "^[a-z0-9]+/[A-Za-z0-9.+_-]+$" } },
+        "categories": { "type": "array", "uniqueItems": true, "items": { "type": "string", "pattern": "^[A-Za-z0-9-]+$" } }
+      }
+    },
+    "health_check": {
+      "type": "object",
+      "required": ["launcher"],
+      "additionalProperties": false,
+      "description": "Post-install check: the launcher must open a window within timeout_s, otherwise the client offers the fallback.",
+      "properties": {
+        "launcher": { "type": "string", "description": "Name of one of the launchers." },
+        "timeout_s": { "type": "integer", "minimum": 5, "maximum": 600, "default": 60 },
+        "window_title": { "type": "string", "maxLength": 200, "description": "Regex the window title must match." }
+      }
+    }
+  }
+}

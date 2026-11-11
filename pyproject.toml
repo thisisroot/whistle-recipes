@@ -1,0 +1,17 @@
+[project]
+name = "whistle-recipes"
+version = "0.1.0"
+description = "Recipe schema and validator for Whistle"
+requires-python = ">=3.12"
+license = "CC0-1.0"
+dependencies = ["jsonschema>=4.19", "pyyaml>=6"]
+
+[project.scripts]
+whistle-recipes-validate = "whistle_recipes.validate:main"
+
+[dependency-groups]
+dev = ["pytest>=8"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

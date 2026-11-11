@@ -1,0 +1,24 @@
+# Notepad++ under Wine, from the official GitHub release.
+schema_version: 1
+id: org.notepad-plus-plus.NotepadPlusPlus
+app: org.notepad-plus-plus.NotepadPlusPlus
+version_range: "8.7"
+runtime: wine
+requires:
+  wine: ">=8.0"
+  arch: win64
+installer:
+  type: download
+  url: https://github.com/notepad-plus-plus/notepad-plus-plus/releases/download/v8.7.1/npp.8.7.1.Installer.x64.exe
+  # TODO: fill in the real hash of the release asset.
+  sha256: "0000000000000000000000000000000000000000000000000000000000000000"
+steps:
+  - run_installer: { args: ["/S"] }
+launchers:
+  - name: Notepad++
+    exe: 'C:\Program Files\Notepad++\notepad++.exe'
+    mime: [text/plain]
+    categories: [Development, TextEditor]
+health_check:
+  launcher: Notepad++
+  window_title: "Notepad\\+\\+"

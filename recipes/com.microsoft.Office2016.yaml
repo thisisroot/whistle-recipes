@@ -1,0 +1,39 @@
+# Office 2016 under Wine. Whistle never hosts the installer: the user picks
+# their own setup.exe, which must match one of the known hashes.
+schema_version: 1
+id: com.microsoft.Office2016
+app: com.microsoft.Office
+version_range: "2016"
+runtime: wine
+requires:
+  wine: ">=9.0"
+  arch: win64
+  ram_mb: 4096
+installer:
+  type: user_supplied
+  prompt: "Select your Office 2016 setup.exe"
+  file_name_hint: setup.exe
+  sha256_any:
+    # TODO: replace with the real hashes of the supported setup.exe builds.
+    - "0000000000000000000000000000000000000000000000000000000000000000"
+steps:
+  - winetricks: [corefonts, msxml6, riched20]
+  - dll_override: { riched20: native }
+  - registry:
+      key: 'HKCU\Software\Wine\Direct2D'
+      value: { max_version_factory: 0 }
+  - run_installer: { args: ["/quiet"], timeout_s: 1800 }
+launchers:
+  - name: Word
+    exe: 'C:\Program Files\Microsoft Office\Office16\WINWORD.EXE'
+    mime: [application/vnd.openxmlformats-officedocument.wordprocessingml.document]
+  - name: Excel
+    exe: 'C:\Program Files\Microsoft Office\Office16\EXCEL.EXE'
+    mime: [application/vnd.openxmlformats-officedocument.spreadsheetml.sheet]
+  - name: PowerPoint
+    exe: 'C:\Program Files\Microsoft Office\Office16\POWERPNT.EXE'
+    mime: [application/vnd.openxmlformats-officedocument.presentationml.presentation]
+health_check:
+  launcher: Word
+  timeout_s: 90
+fallback: vm

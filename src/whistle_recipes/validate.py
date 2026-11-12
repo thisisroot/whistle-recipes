@@ -72,7 +72,9 @@ def _semantic_errors(spec: dict[str, Any], path: Path | None) -> list[str]:
     if path is not None and path.stem != spec["id"]:
         errors.append(f"id: must match the file name ({path.stem!r})")
 
-    names = [launcher["name"] for launcher in spec["launchers"]]
+    names = [launcher["name"] for launcher in spec.get("launchers", [])]
+    if spec["runtime"] in ("wsl", "vm") and not names:
+        errors.append(f"launchers: {spec['runtime']} recipes must list their launchers")
     dupes = sorted({n for n in names if names.count(n) > 1})
     if dupes:
         errors.append(f"launchers: duplicate names {dupes}")

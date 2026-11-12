@@ -37,6 +37,13 @@ def test_minimal_recipes_are_valid():
     assert validate(WSL_BASE) == []
 
 
+def test_wine_recipes_may_leave_launchers_to_the_installer():
+    spec = {k: v for k, v in BASE.items() if k != "launchers"}
+    assert validate(spec) == []
+    wsl = {k: v for k, v in WSL_BASE.items() if k != "launchers"}
+    assert validate(wsl) == ["launchers: wsl recipes must list their launchers"]
+
+
 def set_(path, value):
     def mutate(spec):
         *parents, last = path

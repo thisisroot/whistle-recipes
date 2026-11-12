@@ -79,7 +79,7 @@ The full definition is [`recipe.schema.json`](src/whistle_recipes/recipe.schema.
 | `requires` | Minimum runtime version, `win32`/`win64`, RAM and disk. |
 | `installer` | Where the installer comes from (see below). |
 | `steps` | Typed actions, run in order (see below). |
-| `launchers` | The programs to add to the menu, with optional MIME types and categories. |
+| `launchers` | The programs to add to the menu, with optional MIME types and categories. Leave it out to use the Start Menu shortcuts the installer creates (Wine and Proton). |
 | `health_check` | Which launcher must open a window after install, and how long to wait. |
 | `fallback` | What to offer if the health check fails: `vm` or `none`. |
 
@@ -138,12 +138,18 @@ Every new recipe starts as `draft`, and clients only offer drafts with
 [whistle-server](https://github.com/thisisroot/whistle-server)'s
 `seed/recipe-status.json`. Deleting a recipe file retires it.
 
+**Generated recipes.** For the Windows apps nobody has written a recipe for
+yet, whistle-server generates one from winget's package data and marks it
+`untested`. Those aren't in this repo. A recipe here always wins over a
+generated one for the same app, so writing one is the way to fix an app whose
+generated recipe doesn't work.
+
 ## How recipes reach users
 
 [whistle-server](https://github.com/thisisroot/whistle-server) indexes this repo
 every time it rebuilds the catalog, at least once a day. It stores each change as
 a new revision, so compatibility reports always refer to the exact steps someone
-ran. The current revision goes into the `index.json` that `whistle update`
+ran. The current revision goes into the catalog that `whistle update`
 downloads.
 
 This repo is also a Python package (`whistle_recipes`) that provides the schema

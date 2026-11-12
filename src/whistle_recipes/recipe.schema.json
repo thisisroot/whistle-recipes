@@ -4,7 +4,7 @@
   "title": "Whistle recipe",
   "description": "How to install and launch an app on a host it was not built for. Steps are typed actions from a fixed whitelist; there is no shell.",
   "type": "object",
-  "required": ["schema_version", "id", "app", "runtime", "installer", "launchers"],
+  "required": ["schema_version", "id", "app", "runtime", "installer"],
   "additionalProperties": false,
   "properties": {
     "schema_version": { "const": 1 },
@@ -20,7 +20,10 @@
     "requires": { "$ref": "#/$defs/requires" },
     "installer": { "$ref": "#/$defs/installer" },
     "steps": { "type": "array", "items": { "$ref": "#/$defs/step" } },
-    "launchers": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/launcher" } },
+    "launchers": {
+      "description": "Programs to add to the menu. Leave it out to use the Start Menu shortcuts the installer creates (Wine and Proton only).",
+      "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/launcher" }
+    },
     "health_check": { "$ref": "#/$defs/health_check" },
     "fallback": { "enum": ["vm", "none"], "default": "none" }
   },

@@ -1,13 +1,40 @@
-# whistle-recipes
+<p align="center">
+  <img src="assets/logo.svg" width="96" alt="Whistle logo">
+</p>
 
-Recipes for running apps on an OS they weren't built for, used by
-[Whistle](https://github.com/thisisroot/whistle). For example, a Windows app on
-Linux through Wine, or a Linux app on Windows through WSL.
+<h1 align="center">whistle-recipes</h1>
+
+<p align="center">
+  <b>Recipes for running apps on an OS they weren't built for.</b><br>
+  Windows apps on Linux through Wine, Linux apps on Windows through WSL, for <a href="https://github.com/thisisroot/whistle">Whistle</a>.
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/schema-v1-0F1115?style=flat-square" alt="Schema v1">
+  <img src="https://img.shields.io/badge/runtimes-wine%20%C2%B7%20proton%20%C2%B7%20wsl%20%C2%B7%20vm-0F1115?style=flat-square" alt="Runtimes: wine, proton, wsl, vm">
+  <img src="https://img.shields.io/badge/python-3.12%2B-0F1115?style=flat-square&logo=python&logoColor=white" alt="Python 3.12+">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-CC0--1.0-0F1115?style=flat-square" alt="License: CC0-1.0"></a>
+</p>
+
+<p align="center">
+  <a href="#example">Example</a> ·
+  <a href="#the-format">The format</a> ·
+  <a href="#adding-a-recipe">Adding a recipe</a> ·
+  <a href="#how-recipes-reach-users">How recipes reach users</a>
+</p>
 
 A recipe says where the installer comes from, which typed steps prepare the
-environment, and which programs to add to the menu. There is no shell step:
-recipes can only use the actions in the schema, so they're easy to review and
-can't run arbitrary commands.
+environment, and which programs to add to the menu. With it, this is all a user
+needs to type:
+
+```sh
+whistle install notepad++
+```
+
+Recipes are **data, not scripts**. There is no shell step: a recipe can only use
+the actions in the schema, so it's easy to review and can't run arbitrary
+commands. The Whistle client re-checks every path and registry key before it
+acts on one.
 
 ## Example
 
@@ -33,26 +60,52 @@ launchers:
     mime: [text/plain]
 ```
 
+## The recipes
+
+| Recipe | Runtime | Status |
+| --- | --- | --- |
+| [Notepad++](recipes/org.notepad-plus-plus.NotepadPlusPlus.yaml) | wine | **verified**: install, launch and remove tested on Wine 10 |
+| [GNOME Builder](recipes/org.gnome.Builder.WSL.yaml) | wsl | community |
+| [Microsoft Office 2016](recipes/com.microsoft.Office2016.yaml) | wine | draft: you supply the installer |
+
 ## The format
 
 The full definition is [`recipe.schema.json`](src/whistle_recipes/recipe.schema.json).
-In short:
 
-- **runtime**: `wine`, `proton`, `wsl` or `vm`.
-- **installer**: one of
-  - `download`: an HTTPS URL on the vendor's own site, plus its SHA-256.
-  - `user_supplied`: the user picks the file, which must match one of the listed
-    hashes. Use this for licensed software that can't be downloaded freely.
-  - `package`: a package inside the runtime, such as apt inside WSL.
-- **steps**: `winetricks`, `dll_override`, `registry`, `copy`, `env` and
-  `run_installer`, in order.
-- **launchers**: the programs to add to the menu, with optional MIME types and categories.
-- **health_check**: which launcher must open a window after install.
-  **fallback** says what to offer if it doesn't.
+| Field | Meaning |
+| --- | --- |
+| `id`, `app` | The recipe's ID, and the catalog app it installs (reverse-DNS, like `org.gimp.GIMP`). |
+| `runtime` | `wine`, `proton`, `wsl` or `vm`. |
+| `requires` | Minimum runtime version, `win32`/`win64`, RAM and disk. |
+| `installer` | Where the installer comes from (see below). |
+| `steps` | Typed actions, run in order (see below). |
+| `launchers` | The programs to add to the menu, with optional MIME types and categories. |
+| `health_check` | Which launcher must open a window after install, and how long to wait. |
+| `fallback` | What to offer if the health check fails: `vm` or `none`. |
+
+**Installers:**
+
+| Type | Use it for |
+| --- | --- |
+| `download` | An HTTPS URL on the vendor's own site, plus its SHA-256. |
+| `user_supplied` | Licensed software that can't be downloaded freely. The user picks the file, and it must match one of the listed hashes. |
+| `package` | A package inside the runtime, such as apt inside WSL. |
+
+**Steps:**
+
+| Step | What it does |
+| --- | --- |
+| `winetricks` | Install winetricks verbs, like `vcrun2019` or `corefonts`. |
+| `dll_override` | Set DLLs to `native`, `builtin`, either order, or `disabled`. |
+| `registry` | Set values under `HKCU` or `HKLM`. Strings become `REG_SZ`, integers `REG_DWORD`. |
+| `copy` | Copy a file from the installer media to a Windows path in the prefix. |
+| `env` | Set environment variables for the launchers. `PATH`, `LD_PRELOAD` and similar are refused. |
+| `run_installer` | Run the installer with arguments, such as `/S` for a silent install, and an optional timeout. |
 
 ## Adding a recipe
 
-1. Create `recipes/<id>.yaml`. The file name must match `id`.
+1. Create `recipes/<id>.yaml`. The file name must match `id`, and the app must
+   exist in the Whistle catalog.
 2. Get the installer's SHA-256 from a source you trust: the vendor's published
    checksums, or GitHub's asset digest. Don't just hash whatever you happened
    to download.
@@ -64,23 +117,38 @@ In short:
    uv run pytest
    ```
 
-4. Open a pull request.
+4. Try it for real with the Whistle client:
 
-The app must exist in the Whistle catalog. New recipes start as `draft`, and
-clients only offer drafts with `--allow-draft`. A maintainer promotes a recipe
-to `community` or `verified` in
-[whistle-server](https://github.com/thisisroot/whistle-server)'s `seed/recipe-status.json`.
+   ```sh
+   whistle install <app> --via wine --allow-draft
+   ```
+
+5. Open a pull request.
+
+### Review levels
+
+```mermaid
+flowchart LR
+    D["draft<br/>new, unreviewed"] --> C["community<br/>reviewed, reported working"]
+    C --> V["verified<br/>tested by a maintainer"]
+```
+
+Every new recipe starts as `draft`, and clients only offer drafts with
+`--allow-draft`. A maintainer promotes a recipe in
+[whistle-server](https://github.com/thisisroot/whistle-server)'s
+`seed/recipe-status.json`. Deleting a recipe file retires it.
 
 ## How recipes reach users
 
-whistle-server indexes this repo whenever it rebuilds the catalog. It stores
-each change as a new revision, so compatibility reports always refer to the
-exact steps someone ran. The current revision goes into the index that
-`whistle update` downloads.
+[whistle-server](https://github.com/thisisroot/whistle-server) indexes this repo
+every time it rebuilds the catalog, at least once a day. It stores each change as
+a new revision, so compatibility reports always refer to the exact steps someone
+ran. The current revision goes into the `index.json` that `whistle update`
+downloads.
 
 This repo is also a Python package (`whistle_recipes`) that provides the schema
-and the validator, and whistle-server uses it to check recipes.
+and the validator. whistle-server uses it to check recipes.
 
 ## License
 
-CC0-1.0. Recipes are facts about how to install software, so anyone can reuse them.
+[CC0-1.0](LICENSE). Recipes are facts about how to install software, so anyone can reuse them.
